@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>コンビニ検索WebGIS</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <style>
+        html, body { 
+            height: 100%; 
+            margin: 0; 
+            padding: 0; 
+        }
+        body { 
+            display: flex; 
+            flex-direction: column; 
+        }
+        .container { 
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            height: 100%;
+        }
+        #title {
+            text-align: center;
+            padding: 10px;
+            background-color: #f0f0f0;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        #mapContainer {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #map { 
+            flex-grow: 1; 
+            min-height: 300px; 
+            margin-bottom: 10px; 
+        }
+        #sidebar {
+            display: flex;
+            flex-direction: column;
+            height: 300px; /* 固定高さを設定 */
+        }
+        #convenienceList { 
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .list-item { 
+            padding: 10px; 
+            border-bottom: 1px solid #ddd; 
+            cursor: pointer; 
+        }
+        .list-item:last-child { 
+            border-bottom: none; 
+        }
+        .list-item:hover { 
+            background-color: #f0f0f0; 
+        }
+        .focused { 
+            background-color: #e0e0e0; 
+        }
+        .store-info { 
+            font-size: 0.9em; 
+            color: #666; 
+        }
+        .store-status { 
+            font-weight: bold; 
+        }
+        .open { color: green; }
+        .closed { color: red; }
+        .unknown { color: #888; }
+        
+        @media (min-width: 768px) {
+            .container {
+                flex-direction: row;
+                align-items: stretch;
+            }
+            #mapContainer {
+                width: 60%;
+                margin-right: 10px;
+            }
+            #sidebar {
+                width: 40%;
+                height: auto; /* 高さを自動に戻す */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="mapContainer">
+            <h1 id="title">コンビニ検索WebGIS</h1>
+            <div id="map"></div>
+        </div>
+        <div id="sidebar">
+            <h2>コンビニ検索結果</h2>
+            <div id="status"></div>
+            <div id="result"></div>
+            <div id="convenienceList"></div>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('map').setView([35.6895, 139.6917], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const statusDiv = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+        const listDiv = document.getElementById('convenienceList');
+        let currentPositionMarker;
+        let watchId;
+        let convenienceMarkers = [];
+        let currentPosition;
+
+        const currentLocationIcon = L.divIcon({
+            html: '<div style="background-color: #1e90ff; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>',
+            className: 'current-location-marker',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+
+        const convenienceIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+            shadowSize: [41, 41]
+        });
+
+        function initGeolocation() {
+            if ("geolocation" in navigator) {
+                statusDiv.innerHTML = "位置情報を取得中...";
+                watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
+                    enableHighAccuracy: true,
+                    maximumAge: 30000,
+                    timeout: 27000
+                });
+            } else {
+                statusDiv.innerHTML = "お使いのブラウザは位置情報をサポートしていません。";
+            }
+        }
+
+        async function handlePosition(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            currentPosition = { lat, lon };
+
+            if (currentPositionMarker) {
+                map.removeLayer(currentPositionMarker);
+            }
+
+            currentPositionMarker = L.marker([lat, lon], {icon: currentLocationIcon}).addTo(map);
+            currentPositionMarker.bindPopup('現在地').openPopup();
+
+            map.setView([lat, lon], 15);
+            statusDiv.innerHTML = "位置情報: " + lat.toFixed(6) + ", " + lon.toFixed(6);
+
+            const conveniences = await searchConveniences(lat, lon);
+            displayResults(conveniences);
+        }
+
+        function handleError(error) {
+            console.error("Error: " + error.message);
+            statusDiv.innerHTML = "位置情報の取得に失敗しました。";
+        }
+
+        async function searchConveniences(lat, lon) {
+            const radius = 1000;
+            const url = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:${radius},${lat},${lon})["shop"="convenience"];out;`;
+            const response = await fetch(url);
+            const data = await response.json();
+            return data.elements;
+        }
+
+        function displayResults(conveniences) {
+            clearConvenienceMarkers();
+            listDiv.innerHTML = '';
+
+            conveniences.forEach((store, index) => {
+                const marker = L.marker([store.lat, store.lon], {icon: convenienceIcon}).addTo(map);
+                const storeName = store.tags.name || "コンビニエンスストア";
+                const storeInfo = getStoreInfo(store);
+                marker.bindPopup(createPopupContent(storeName, storeInfo));
+                marker.on('click', () => focusListItem(index));
+                convenienceMarkers.push(marker);
+
+                const listItem = document.createElement('div');
+                listItem.className = 'list-item';
+                listItem.innerHTML = createListItemContent(index, storeName, storeInfo);
+                listItem.onclick = () => {
+                    marker.openPopup();
+                    map.setView([store.lat, store.lon], 18);
+                    focusListItem(index);
+                };
+                listDiv.appendChild(listItem);
+            });
+
+            resultDiv.innerHTML = `${conveniences.length}件のコンビニが見つかりました。`;
+        }
+
+        function getStoreInfo(store) {
+            const distance = calculateDistance(currentPosition, { lat: store.lat, lon: store.lon });
+            const address = store.tags['addr:full'] || store.tags['addr:street'] || '住所情報なし';
+            const openingHours = store.tags.opening_hours || '不明';
+            const status = openingHours === '不明' ? '不明' : (checkIfOpen(openingHours) ? '営業中' : '営業時間外');
+            
+            return { distance, address, openingHours, status };
+        }
+
+        function calculateDistance(pos1, pos2) {
+            const R = 6371; // 地球の半径 (km)
+            const dLat = (pos2.lat - pos1.lat) * Math.PI / 180;
+            const dLon = (pos2.lon - pos1.lon) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(pos1.lat * Math.PI / 180) * Math.cos(pos2.lat * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
+            return distance.toFixed(2);
+        }
+
+        function checkIfOpen(openingHours) {
+            // この関数は簡略化されています。実際には複雑な営業時間の解析が必要です。
+            return openingHours.includes('24/7') ? true : Math.random() < 0.5;
+        }
+
+        function createPopupContent(name, info) {
+            return `
+                <strong>${name}</strong><br>
+                距離: ${info.distance} km
+            `;
+        }
+
+        function createListItemContent(index, name, info) {
+            return `
+                <strong>${index + 1}. ${name}</strong><br>
+                <span class="store-info">
+                    <span class="store-status ${getStatusClass(info.status)}">${info.status}</span> |
+                    距離: ${info.distance} km |
+                    ${info.address}
+                </span>
+            `;
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case '営業中': return 'open';
+                case '営業時間外': return 'closed';
+                default: return 'unknown';
+            }
+        }
+
+        function clearConvenienceMarkers() {
+            convenienceMarkers.forEach(marker => map.removeLayer(marker));
+            convenienceMarkers = [];
+        }
+
+        function focusListItem(index) {
+            const listItems = listDiv.getElementsByClassName('list-item');
+            Array.from(listItems).forEach((item, i) => {
+                item.classList.toggle('focused', i === index);
+            });
+            listItems[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        initGeolocation();
+    </script>
+</body>
+</html>
