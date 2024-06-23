@@ -1,131 +1,204 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>コンビニ検索WebGIS</title>
+    <title>周辺コンビニ検索</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
     <style>
-        html, body { 
-            height: 100%; 
-            margin: 0; 
-            padding: 0; 
+        :root {
+            --primary-color: #9b4dca;
+            --light-gray: #f4f5f6;
         }
-        body { 
-            display: flex; 
-            flex-direction: column; 
-        }
-        .container { 
-            flex-grow: 1;
+
+        body {
             display: flex;
             flex-direction: column;
-            padding: 10px;
-            max-width: 100%;
-            width: 100%;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+            background-color: #fff;
+            color: #606c76;
+        }
+
+        .header {
+            background-color: #fff;
+            padding: 1rem 0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .logo {
+            font-size: 2.4rem;
+            font-weight: 300;
+            color: var(--primary-color);
+        }
+
+        .github-link {
+            display: flex;
+            align-items: center;
+            color: #606c76;
+            text-decoration: none;
+        }
+
+        .github-link svg {
+            margin-right: 0.5rem;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
             box-sizing: border-box;
-            height: 100%;
         }
-        #title {
-            text-align: center;
-            padding: 10px;
-            background-color: #f0f0f0;
-            margin-bottom: 10px;
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            height: calc(100vh - 150px);
+            /* ヘッダーとパディングを考慮した高さ */
+        }
+
+        #map {
+            flex: 2;
             border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        #mapContainer {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        #map { 
-            flex-grow: 1; 
-            min-height: 300px; 
-            margin-bottom: 10px; 
-        }
+
         #sidebar {
+            flex: 1;
+            background-color: var(--light-gray);
+            padding: 2rem;
+            border-radius: 4px;
             display: flex;
             flex-direction: column;
-            height: 300px; /* 固定高さを設定 */
+            overflow: hidden;
+            /* はみ出た内容を隠す */
         }
-        #convenienceList { 
+
+        #sidebar h2 {
+            font-size: 2.4rem;
+            /* ロゴと同じサイズに調整 */
+            font-weight: 300;
+            margin-bottom: 1rem;
+        }
+
+        #searchButton {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            margin-top: 1rem;
+        }
+
+        #convenienceList {
+            margin-top: 1rem;
             flex-grow: 1;
             overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 4px;
         }
-        .list-item { 
-            padding: 10px; 
-            border-bottom: 1px solid #ddd; 
-            cursor: pointer; 
+
+        .list-item {
+            padding: 1rem;
+            border-bottom: 1px solid #e1e1e1;
+            cursor: pointer;
         }
-        .list-item:last-child { 
-            border-bottom: none; 
+
+        .list-item:last-child {
+            border-bottom: none;
         }
-        .list-item:hover { 
-            background-color: #f0f0f0; 
+
+        .list-item:hover {
+            background-color: #f0f0f0;
         }
-        .focused { 
-            background-color: #e0e0e0; 
+
+        .store-info {
+            font-size: 0.9em;
+            color: #606c76;
         }
-        .store-info { 
-            font-size: 0.9em; 
-            color: #666; 
+
+        .store-status {
+            font-weight: bold;
         }
-        .store-status { 
-            font-weight: bold; 
+
+        .open {
+            color: #5cb85c;
         }
-        .open { color: green; }
-        .closed { color: red; }
-        .unknown { color: #888; }
-        
+
+        .closed {
+            color: #d9534f;
+        }
+
+        .unknown {
+            color: #f0ad4e;
+        }
+
         @media (min-width: 768px) {
-            .container {
+            .content {
                 flex-direction: row;
-                align-items: stretch;
-            }
-            #mapContainer {
-                width: 60%;
-                margin-right: 10px;
-            }
-            #sidebar {
-                width: 40%;
-                height: auto; /* 高さを自動に戻す */
             }
         }
     </style>
 </head>
+
 <body>
-    <div class="container">
-        <div id="mapContainer">
-            <h1 id="title">コンビニ検索WebGIS</h1>
-            <div id="map"></div>
+    <header class="header">
+        <div class="header-content">
+            <h1 class="logo">周辺コンビニ検索</h1>
+            <a href="https://github.com/tomot7/webgis_conveniencestore_search" class="github-link" target="_blank"
+                rel="noopener noreferrer">
+                <svg height="32" aria-hidden="true" viewBox="0 0 16 16" version="1.1" width="32"
+                    data-view-component="true">
+                    <path fill-rule="evenodd"
+                        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
+                    </path>
+                </svg>
+                GitHub
+            </a>
         </div>
-        <div id="sidebar">
-            <h2>コンビニ検索結果</h2>
-            <div id="status"></div>
-            <div id="result"></div>
-            <div id="convenienceList"></div>
+    </header>
+    <div class="container">
+        <div class="content">
+            <div id="map"></div>
+            <div id="sidebar">
+                <h2>検索結果</h2>
+                <div id="result"></div>
+                <button id="searchButton">コンビニ再検索</button>
+                <div id="convenienceList"></div>
+            </div>
         </div>
     </div>
 
     <script>
+        // JavaScript code remains the same as in the previous version
         const map = L.map('map').setView([35.6895, 139.6917], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        const statusDiv = document.getElementById('status');
         const resultDiv = document.getElementById('result');
         const listDiv = document.getElementById('convenienceList');
+        const searchButton = document.getElementById('searchButton');
         let currentPositionMarker;
         let watchId;
         let convenienceMarkers = [];
         let currentPosition;
 
         const currentLocationIcon = L.divIcon({
-            html: '<div style="background-color: #1e90ff; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>',
+            html: '<div style="background-color: #ff0000; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>',
             className: 'current-location-marker',
             iconSize: [16, 16],
             iconAnchor: [8, 8]
@@ -142,14 +215,13 @@
 
         function initGeolocation() {
             if ("geolocation" in navigator) {
-                statusDiv.innerHTML = "位置情報を取得中...";
                 watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
                     enableHighAccuracy: true,
                     maximumAge: 30000,
                     timeout: 27000
                 });
             } else {
-                statusDiv.innerHTML = "お使いのブラウザは位置情報をサポートしていません。";
+                resultDiv.innerHTML = "お使いのブラウザは位置情報をサポートしていません。";
             }
         }
 
@@ -162,27 +234,31 @@
                 map.removeLayer(currentPositionMarker);
             }
 
-            currentPositionMarker = L.marker([lat, lon], {icon: currentLocationIcon}).addTo(map);
-            currentPositionMarker.bindPopup('現在地').openPopup();
+            currentPositionMarker = L.marker([lat, lon], { icon: currentLocationIcon }).addTo(map);
 
             map.setView([lat, lon], 15);
-            statusDiv.innerHTML = "位置情報: " + lat.toFixed(6) + ", " + lon.toFixed(6);
 
-            const conveniences = await searchConveniences(lat, lon);
-            displayResults(conveniences);
+            if (!convenienceMarkers.length) {
+                await searchConveniences();
+            }
         }
 
         function handleError(error) {
             console.error("Error: " + error.message);
-            statusDiv.innerHTML = "位置情報の取得に失敗しました。";
+            resultDiv.innerHTML = "位置情報の取得に失敗しました。";
         }
 
-        async function searchConveniences(lat, lon) {
+        async function searchConveniences() {
+            if (!currentPosition) {
+                resultDiv.innerHTML = "現在地が取得できていません。";
+                return;
+            }
+
             const radius = 1000;
-            const url = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:${radius},${lat},${lon})["shop"="convenience"];out;`;
+            const url = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:${radius},${currentPosition.lat},${currentPosition.lon})["shop"="convenience"];out;`;
             const response = await fetch(url);
             const data = await response.json();
-            return data.elements;
+            displayResults(data.elements);
         }
 
         function displayResults(conveniences) {
@@ -190,7 +266,7 @@
             listDiv.innerHTML = '';
 
             conveniences.forEach((store, index) => {
-                const marker = L.marker([store.lat, store.lon], {icon: convenienceIcon}).addTo(map);
+                const marker = L.marker([store.lat, store.lon], { icon: convenienceIcon }).addTo(map);
                 const storeName = store.tags.name || "コンビニエンスストア";
                 const storeInfo = getStoreInfo(store);
                 marker.bindPopup(createPopupContent(storeName, storeInfo));
@@ -216,7 +292,7 @@
             const address = store.tags['addr:full'] || store.tags['addr:street'] || '住所情報なし';
             const openingHours = store.tags.opening_hours || '不明';
             const status = openingHours === '不明' ? '不明' : (checkIfOpen(openingHours) ? '営業中' : '営業時間外');
-            
+
             return { distance, address, openingHours, status };
         }
 
@@ -224,10 +300,10 @@
             const R = 6371; // 地球の半径 (km)
             const dLat = (pos2.lat - pos1.lat) * Math.PI / 180;
             const dLon = (pos2.lon - pos1.lon) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(pos1.lat * Math.PI / 180) * Math.cos(pos2.lat * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(pos1.lat * Math.PI / 180) * Math.cos(pos2.lat * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const distance = R * c;
             return distance.toFixed(2);
         }
@@ -276,7 +352,10 @@
             listItems[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
+        searchButton.addEventListener('click', searchConveniences);
+
         initGeolocation();
     </script>
 </body>
+
 </html>
