@@ -37,13 +37,14 @@
             align-items: center;
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 2rem;
+            padding: 0 1rem;
         }
 
         .logo {
             font-size: 2.4rem;
             font-weight: 300;
             color: var(--primary-color);
+            margin: 0;
         }
 
         .github-link {
@@ -51,10 +52,8 @@
             align-items: center;
             color: #606c76;
             text-decoration: none;
-        }
-
-        .github-link svg {
-            margin-right: 0.5rem;
+            font-size: 1.8rem;
+            font-weight: 300;
         }
 
         .container {
@@ -63,56 +62,53 @@
             flex-direction: column;
             max-width: 1200px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 1rem;
             box-sizing: border-box;
         }
 
         .content {
             display: flex;
             flex-direction: column;
-            gap: 2rem;
-            height: calc(100vh - 150px);
-            /* ヘッダーとパディングを考慮した高さ */
+            gap: 1rem;
+            height: calc(100vh - 90px);
         }
 
         #map {
-            flex: 2;
+            flex: 1;
+            min-height: 200px;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         #sidebar {
-            flex: 1;
             background-color: var(--light-gray);
-            padding: 2rem;
+            padding: 1rem;
             border-radius: 4px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            /* はみ出た内容を隠す */
         }
 
         #sidebar h2 {
-            font-size: 2.4rem;
-            /* ロゴと同じサイズに調整 */
+            font-size: 1.8rem;
             font-weight: 300;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
         }
 
         #searchButton {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
-            margin-top: 1rem;
+            margin-top: 0.5rem;
         }
 
         #convenienceList {
-            margin-top: 1rem;
+            margin-top: 0.5rem;
             flex-grow: 1;
             overflow-y: auto;
         }
 
         .list-item {
-            padding: 1rem;
+            padding: 0.5rem;
             border-bottom: 1px solid #e1e1e1;
             cursor: pointer;
         }
@@ -149,6 +145,30 @@
         @media (min-width: 768px) {
             .content {
                 flex-direction: row;
+                height: calc(100vh - 100px);
+            }
+
+            #map {
+                flex: 2;
+            }
+
+            #sidebar {
+                flex: 1;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .content {
+                height: calc(100vh - 90px);
+            }
+
+            #map {
+                height: 35vh;
+            }
+
+            #sidebar {
+                height: calc(65vh - 90px);
+                overflow-y: auto;
             }
         }
     </style>
@@ -160,12 +180,6 @@
             <h1 class="logo">周辺コンビニ検索</h1>
             <a href="https://github.com/tomot7/webgis_conveniencestore_search" class="github-link" target="_blank"
                 rel="noopener noreferrer">
-                <svg height="32" aria-hidden="true" viewBox="0 0 16 16" version="1.1" width="32"
-                    data-view-component="true">
-                    <path fill-rule="evenodd"
-                        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
-                    </path>
-                </svg>
                 GitHub
             </a>
         </div>
